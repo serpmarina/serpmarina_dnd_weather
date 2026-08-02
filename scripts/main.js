@@ -4,13 +4,16 @@
 
 import { BIOMES, BIOME_LABELS, SEASON_LABELS, getSeason, getRandomWeather, getWeatherDescription } from "./weather-data.js";
 
+// Глобальные переменные для отслеживания времени (инициализируются в хуке ready)
+let lastCheckedTime = 0;
+let lastCheckedDate = 0;
+
 // ═══════════════════════════════════════════
 // 1. РЕГИСТРАЦИЯ НАСТРОЕК
 // ═══════════════════════════════════════════
 Hooks.once("init", () => {
   console.log("D&D Weather System | Инициализация модуля");
 
-  // Глобальное хранилище текущей погоды
   game.settings.register("dnd-weather", "current-weather", {
     scope: "world",
     config: false,
@@ -18,7 +21,6 @@ Hooks.once("init", () => {
     default: { type: "", label: "Ясно", description: "", day: -1 }
   });
 
-  // Настройка: время генерации погоды (по умолчанию 6 утра)
   game.settings.register("dnd-weather", "generate-hour", {
     scope: "world",
     config: true,
@@ -37,7 +39,6 @@ Hooks.on("renderSceneConfig", (app, html, data) => {
   const scene = app.document;
   const currentBiome = scene.getFlag("world", "weather-biome") || "forest";
 
-  // Создаём HTML для вкладки биома
   const biomeHtml = `
     <div class="form-group">
       <label>Биом погоды</label>
@@ -50,13 +51,14 @@ Hooks.on("renderSceneConfig", (app, html, data) => {
     </div>
   `;
 
-  // Добавляем в секцию "Environment" (или создаём новую)
-  const envTab = html.find('[data-tab="environment"]');
+  // ИСПРАВЛЕНИЕ: Оборачиваем html в jQuery для совместимости с Foundry v12/v13
+  const $html = $(html);
+  const envTab = $html.find('[data-tab="environment"]');
+  
   if (envTab.length > 0) {
     envTab.find('.form-group').last().after(biomeHtml);
   } else {
-    // Если вкладки нет, добавляем в конец
-    html.find('.sheet-body').append(biomeHtml);
+    $html.find('.sheet-body').append(biomeHtml);
   }
 });
 
@@ -124,9 +126,6 @@ Hooks.on("canvasReady", () => {
 // ═══════════════════════════════════════════
 // 6. ХУК: ГЕНЕРАЦИЯ ПОГОДЫ В ЗАДАННЫЙ ЧАС
 // ═══════════════════════════════════════════
-let lastCheckedTime = game.time.worldTime;
-let lastCheckedDate = Math.floor(lastCheckedTime / 86400);
-
 Hooks.on("updateWorldTime", (worldTime) => {
   if (!game.user.isGM) return;
 
@@ -166,18 +165,23 @@ Hooks.on("updateWorldTime", (worldTime) => {
 });
 
 // ═══════════════════════════════════════════
-// 7. СИНХРОНИЗАЦИЯ ПРИ ЗАГРУЗКЕ МИРА
+// 7. ИНИЦИАЛИЗАЦИЯ ВРЕМЕНИ И СИНХРОНИЗАЦИЯ ПРИ ЗАГРУЗКЕ
 // ═══════════════════════════════════════════
-Hooks.once("canvasReady", () => {
+Hooks.once("ready", () => {
   if (!game.user.isGM) return;
   
+  // ИСПРАВЛЕНИЕ: Читаем время только после полной загрузки игры
+  lastCheckedTime = game.time.worldTime;
+  lastCheckedDate = Math.floor(lastCheckedTime / 86400);
+  console.log("D&D Weather System | Отслеживание времени инициализировано.");
+
   const stored = game.settings.get("dnd-weather", "current-weather");
   const currentDay = Math.floor(game.time.worldTime / 86400);
   
   if (!stored || stored.day < currentDay) {
     const newWeather = generateWorldWeather();
     game.settings.set("dnd-weather", "current-weather", newWeather);
-    console.log("D&D Weather | Погода устарела, сгенерирована новая:", newWeather);
+    console.log("D&D Weather | Погода устарела или отсутствует, сгенерирована новая:", newWeather);
   }
   
   game.scenes.forEach(scene => applyWeatherToScene(scene));
