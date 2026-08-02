@@ -19,6 +19,6 @@
     "styles/weather.css"
   ],
 "url": "https://github.com/serpmarina/serpmarina_dnd_weather",
-  "manifest": "https://github.com/serpmarina/serpmarina_dnd_weather/releases/latest/download/module.json",
+  "manifest": "https://raw.githubusercontent.com/serpmarina/serpmarina_dnd_weather/main/module.json",
   "download": "https://github.com/serpmarina/serpmarina_dnd_weather/releases/download/v1.0.0/serpmarina_dnd_weather.zip"
 }
