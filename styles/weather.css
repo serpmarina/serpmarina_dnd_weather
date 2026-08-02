@@ -1,0 +1,33 @@
+/* D&D Weather System Styles */
+
+.weather-forecast-app {
+  min-width: 400px;
+}
+
+.weather-forecast-app .forecast-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.weather-forecast-app .forecast-table th,
+.weather-forecast-app .forecast-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-light-tertiary);
+}
+
+.weather-forecast-app .forecast-table th {
+  background: var(--color-bg-option);
+  font-weight: bold;
+}
+
+.weather-forecast-app .forecast-day {
+  font-weight: bold;
+}
+
+.weather-forecast-app .forecast-description {
+  font-style: italic;
+  font-size: 0.9em;
+  opacity: 0.8;
+  margin-top: 4px;
+}
