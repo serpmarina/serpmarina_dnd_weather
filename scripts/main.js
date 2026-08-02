@@ -4,7 +4,7 @@
 
 import { BIOMES, BIOME_LABELS, SEASON_LABELS, getSeason, getRandomWeather, getWeatherDescription } from "./weather-data.js";
 
-// Глобальные переменные для отслеживания времени (инициализируются в хуке ready)
+// Глобальные переменные для отслеживания времени
 let lastCheckedTime = 0;
 let lastCheckedDate = 0;
 
@@ -51,7 +51,7 @@ Hooks.on("renderSceneConfig", (app, html, data) => {
     </div>
   `;
 
-  // ИСПРАВЛЕНИЕ: Оборачиваем html в jQuery для совместимости с Foundry v12/v13
+  // ИСПРАВЛЕНИЕ: Оборачиваем html в jQuery для совместимости
   const $html = $(html);
   const envTab = $html.find('[data-tab="environment"]');
   
@@ -93,40 +93,38 @@ function generateWorldWeather() {
 // ═══════════════════════════════════════════
 // 4. ПРИМЕНЕНИЕ ПОГОДЫ К СЦЕНЕ
 // ═══════════════════════════════════════════
-function applyWeatherToScene(scene) {
+async function applyWeatherToScene(scene) {
   const globalWeather = game.settings.get("dnd-weather", "current-weather");
   const biome = scene.getFlag("world", "weather-biome") || "forest";
 
   let visualType = globalWeather.type;
   if (biome === "dungeon") visualType = "";
 
-  return scene.update({ weather: visualType });
+  // Проверяем, отличается ли текущая погода от нужной
+  if (scene.weather !== visualType) {
+    console.log(`D&D Weather | Применяем "${visualType}" к сцене "${scene.name}" (биом: ${biome})`);
+    await scene.update({ weather: visualType });
+  }
 }
 
 // ═══════════════════════════════════════════
 // 5. ХУК: ЗАГРУЗКА СЦЕНЫ → синхронизация
 // ═══════════════════════════════════════════
-Hooks.on("canvasReady", () => {
+Hooks.on("canvasReady", async () => {
   if (!game.user.isGM || !canvas.scene) return;
   
-  const globalWeather = game.settings.get("dnd-weather", "current-weather");
-  const biome = canvas.scene.getFlag("world", "weather-biome") || "forest";
+  console.log(`D&D Weather | Сцена "${canvas.scene.name}" загружена, синхронизируем погоду...`);
   
-  let visualType = globalWeather.type;
-  if (biome === "dungeon") visualType = "";
-  
+  // Небольшая задержка, чтобы дать Foundry время на отрисовку
   setTimeout(async () => {
-    if (canvas.scene.weather !== visualType) {
-      console.log(`D&D Weather | Синхронизация "${canvas.scene.name}": ${visualType}`);
-      await canvas.scene.update({ weather: visualType });
-    }
-  }, 150);
+    await applyWeatherToScene(canvas.scene);
+  }, 200);
 });
 
 // ═══════════════════════════════════════════
 // 6. ХУК: ГЕНЕРАЦИЯ ПОГОДЫ В ЗАДАННЫЙ ЧАС
 // ═══════════════════════════════════════════
-Hooks.on("updateWorldTime", (worldTime) => {
+Hooks.on("updateWorldTime", async (worldTime) => {
   if (!game.user.isGM) return;
 
   const generateHour = game.settings.get("dnd-weather", "generate-hour");
@@ -138,20 +136,24 @@ Hooks.on("updateWorldTime", (worldTime) => {
                                (currentDay > lastCheckedDate && currentHour >= generateHour);
 
   if (crossedGenerateHour) {
+    console.log(`D&D Weather | Наступило ${generateHour}:00 дня ${currentDay}, генерируем погоду...`);
+    
     const newWeather = generateWorldWeather();
-    game.settings.set("dnd-weather", "current-weather", newWeather);
+    await game.settings.set("dnd-weather", "current-weather", newWeather);
 
-    console.log(`D&D Weather | Новый день ${currentDay}. Погода:`, newWeather);
+    // Применяем ко всем сценам
+    for (const scene of game.scenes) {
+      await applyWeatherToScene(scene);
+    }
 
-    game.scenes.forEach(scene => applyWeatherToScene(scene));
-
-    ChatMessage.create({
+    // Отправляем сообщение в чат
+    await ChatMessage.create({
       user: game.users.find(u => u.isGM)?.id || game.user.id,
       content: `
         <div style="border-left: 4px solid #7b3f00; padding: 12px 16px; background: rgba(0,0,0,0.08); border-radius: 4px;">
           <h3 style="margin: 0 0 6px 0; font-size: 1.15em;">🌅 Утро нового дня</h3>
           <p style="margin: 0 0 4px 0; font-size: 0.85em; opacity: 0.7;">День ${currentDay} · ${newWeather.seasonLabel}</p>
-          <p style="margin: 0 0 6px 0;"><strong>📍 Биом:</strong> ${newWeather.biomeLabel}</p>
+          <p style="margin: 0 0 6px 0;"><strong> Биом:</strong> ${newWeather.biomeLabel}</p>
           <p style="margin: 0 0 10px 0;"><strong>🌦 Погода:</strong> ${newWeather.label}</p>
           ${newWeather.description ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.15);">${newWeather.description}</div>` : ""}
         </div>
@@ -167,10 +169,10 @@ Hooks.on("updateWorldTime", (worldTime) => {
 // ═══════════════════════════════════════════
 // 7. ИНИЦИАЛИЗАЦИЯ ВРЕМЕНИ И СИНХРОНИЗАЦИЯ ПРИ ЗАГРУЗКЕ
 // ═══════════════════════════════════════════
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
   if (!game.user.isGM) return;
   
-  // ИСПРАВЛЕНИЕ: Читаем время только после полной загрузки игры
+  // Инициализируем переменные времени
   lastCheckedTime = game.time.worldTime;
   lastCheckedDate = Math.floor(lastCheckedTime / 86400);
   console.log("D&D Weather System | Отслеживание времени инициализировано.");
@@ -180,11 +182,14 @@ Hooks.once("ready", () => {
   
   if (!stored || stored.day < currentDay) {
     const newWeather = generateWorldWeather();
-    game.settings.set("dnd-weather", "current-weather", newWeather);
+    await game.settings.set("dnd-weather", "current-weather", newWeather);
     console.log("D&D Weather | Погода устарела или отсутствует, сгенерирована новая:", newWeather);
   }
   
-  game.scenes.forEach(scene => applyWeatherToScene(scene));
+  // Применяем погоду ко всем сценам
+  for (const scene of game.scenes) {
+    await applyWeatherToScene(scene);
+  }
 });
 
 console.log("D&D Weather System | Модуль загружен.");
