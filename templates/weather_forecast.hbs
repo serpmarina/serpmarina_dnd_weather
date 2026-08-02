@@ -1,0 +1,39 @@
+<div class="weather-forecast-app">
+  <div class="forecast-header">
+    <h2>🌤 Прогноз погоды на неделю</h2>
+    <p class="current-biome">Текущий биом: <strong>{{currentBiome}}</strong></p>
+  </div>
+  
+  <table class="forecast-table">
+    <thead>
+      <tr>
+        <th>День</th>
+        <th>Сезон</th>
+        <th>Погода</th>
+        <th>Описание</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each forecast}}
+      <tr>
+        <td class="forecast-day">День {{this.day}}</td>
+        <td>{{this.seasonLabel}}</td>
+        <td><strong>{{this.label}}</strong></td>
+        <td>
+          {{#if this.description}}
+          <div class="forecast-description">{{{this.description}}}</div>
+          {{else}}
+          <span style="opacity: 0.5;">—</span>
+          {{/if}}
+        </td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  
+  <div class="forecast-actions">
+    <button type="button" class="send-to-chat">
+      <i class="fas fa-paper-plane"></i> Отправить текущий прогноз в чат
+    </button>
+  </div>
+</div>
