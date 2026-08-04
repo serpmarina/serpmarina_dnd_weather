@@ -2,7 +2,7 @@
   "id": "dnd-weather",
   "title": "D&D Weather System",
   "description": "Автоматическая система погоды для D&D 5e с учётом биомов и сезонов",
-  "version": "1.1.1",
+  "version": "1.1.0",
   "compatibility": {
     "minimum": "13",
     "verified": "13.351"
@@ -20,5 +20,5 @@
   ],
 "url": "https://github.com/serpmarina/serpmarina_dnd_weather",
   "manifest": "https://raw.githubusercontent.com/serpmarina/serpmarina_dnd_weather/main/module.json",
-  "download": "https://github.com/serpmarina/serpmarina_dnd_weather/releases/download/v1.1.1/module.zip"
+  "download": "https://github.com/serpmarina/serpmarina_dnd_weather/releases/download/v1.1.0/module.zip"
 }
