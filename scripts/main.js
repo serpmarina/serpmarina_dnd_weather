@@ -108,25 +108,38 @@ async function checkAndUpdateWeather() {
       await applyWeatherToScene(scene);
     }
 
-    // ИСПРАВЛЕНИЕ: Проверяем, что сообщение создаётся
+    // ПРОСТАЯ ОТПРАВКА СООБЩЕНИЯ (для теста)
+    const gmUser = game.users.find(u => u.isGM && u.active);
+    console.log("D&D Weather | GM User:", gmUser);
+    console.log("D&D Weather | CONST.CHAT_MESSAGE_STYLES:", CONST.CHAT_MESSAGE_STYLES);
+
+    const messageContent = `
+      <div style="border-left: 4px solid #7b3f00; padding: 12px 16px; background: rgba(0,0,0,0.08); border-radius: 4px;">
+        <h3 style="margin: 0 0 6px 0; font-size: 1.15em;">🌦 Смена погоды</h3>
+        <p style="margin: 0 0 4px 0; font-size: 0.85em; opacity: 0.7;">${newWeather.seasonLabel} · Биом: ${newWeather.biomeLabel}</p>
+        <p style="margin: 0 0 6px 0;"><strong>Новая погода:</strong> ${newWeather.label}</p>
+        <p style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;"><strong>⏱ Продлится:</strong> ~${newWeather.duration} ч.</p>
+        ${newWeather.description ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.15);">${newWeather.description}</div>` : ""}
+      </div>
+    `;
+
     try {
-      await ChatMessage.create({
-        user: game.users.find(u => u.isGM)?.id || game.user.id,
-        content: `
-          <div style="border-left: 4px solid #7b3f00; padding: 12px 16px; background: rgba(0,0,0,0.08); border-radius: 4px;">
-            <h3 style="margin: 0 0 6px 0; font-size: 1.15em;">🌦 Смена погоды</h3>
-            <p style="margin: 0 0 4px 0; font-size: 0.85em; opacity: 0.7;">${newWeather.seasonLabel} · Биом: ${newWeather.biomeLabel}</p>
-            <p style="margin: 0 0 6px 0;"><strong>Новая погода:</strong> ${newWeather.label}</p>
-            <p style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;"><strong>⏱ Продлится:</strong> ~${newWeather.duration} ч.</p>
-            ${newWeather.description ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.15);">${newWeather.description}</div>` : ""}
-          </div>
-        `,
-        style: CONST.CHAT_MESSAGE_STYLES.WHISPER,
-        whisper: [game.users.find(u => u.isGM)?.id || game.user.id]
+      const msg = await ChatMessage.create({
+        user: gmUser?.id || game.user.id,
+        content: messageContent,
+        type: CONST.CHAT_MESSAGE_TYPES.WHISPER || 2,
+        whisper: gmUser ? [gmUser.id] : []
       });
-      console.log("D&D Weather | Сообщение о смене погоды отправлено в чат");
+      console.log("D&D Weather | Сообщение создано:", msg);
     } catch (err) {
-      console.error("D&D Weather | Ошибка при отправке сообщения:", err);
+      console.error("D&D Weather | Ошибка ChatMessage.create:", err);
+      // Запасной вариант — отправляем в общий чат
+      await ChatMessage.create({
+        user: game.user.id,
+        content: messageContent,
+        type: CONST.CHAT_MESSAGE_TYPES.OOC || 0
+      });
+      console.log("D&D Weather | Отправлено запасное OOC сообщение");
     }
 
     return true;
