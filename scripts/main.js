@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
-// D&D WEATHER SYSTEM - MAIN ENTRY POINT (v2.2)
-// Логика: последовательная смена событий + умный UI + мгновенное обновление
+// D&D WEATHER SYSTEM - MAIN ENTRY POINT (v2.3)
+// Исправлено: UI встраивание + отладка генерации
 // ═══════════════════════════════════════════
 
 import { BIOMES, BIOME_LABELS, SEASON_LABELS, getSeason, getRandomWeather, getWeatherDescription } from "./weather-data.js";
@@ -9,7 +9,7 @@ import { BIOMES, BIOME_LABELS, SEASON_LABELS, getSeason, getRandomWeather, getWe
 // 1. РЕГИСТРАЦИЯ НАСТРОЕК МОДУЛЯ
 // ═══════════════════════════════════════════
 Hooks.once("init", () => {
-  console.log("D&D Weather System | Инициализация модуля v2.2");
+  console.log("D&D Weather System | Инициализация модуля v2.3");
 
   game.settings.register("dnd-weather", "current-weather", {
     scope: "world",
@@ -70,7 +70,6 @@ function generateNewWeatherEvent() {
   const season = getSeason(dayOfYear);
 
   const desc = getWeatherDescription(biomeKey, season, weather.type);
-  // ИСПРАВЛЕНИЕ: Убрали дублирование длительности из описания
   const description = desc ? `<em>"${desc.text}"</em>` : "";
 
   const minDuration = game.settings.get("dnd-weather", "min-duration") || 1;
@@ -109,7 +108,6 @@ async function checkAndUpdateWeather() {
       await applyWeatherToScene(scene);
     }
 
-    // ИСПРАВЛЕНИЕ: Отправка в личку ГМ (WHISPER)
     await ChatMessage.create({
       user: game.users.find(u => u.isGM)?.id || game.user.id,
       content: `
@@ -143,7 +141,6 @@ async function applyWeatherToScene(scene) {
     return;
   }
 
-  // ИСПРАВЛЕНИЕ: Локальный биом имеет приоритет над глобальным
   let biomeKey = localBiome || game.settings.get("dnd-weather", "default-biome") || "forest";
   let visualType = currentWeather.type;
   
@@ -155,8 +152,8 @@ async function applyWeatherToScene(scene) {
   }
 }
 
-// ══════════════════════════════════════════
-// 5. ХУК: НАСТРОЙКИ СЦЕНЫ (UI для биома)
+// ═══════════════════════════════════════════
+// 5. ХУК: НАСТРОЙКИ СЦЕНЫ (ИСПРАВЛЕННОЕ ВСТРАИВАНИЕ)
 // ═══════════════════════════════════════════
 Hooks.on("renderSceneConfig", (app, html, data) => {
   const scene = app.document;
@@ -186,22 +183,19 @@ Hooks.on("renderSceneConfig", (app, html, data) => {
   `;
 
   const $html = $(html);
-  const ambienceTab = $html.find('[data-tab="ambience"]');
   
-  if (ambienceTab.length > 0) {
-    const basicsSection = ambienceTab.find('[data-tab="basics"]');
-    if (basicsSection.length > 0) {
-      // Ищем поле "Погодные эффекты" и вставляем ПОСЛЕ него
-      const weatherEffectsField = basicsSection.find('select[name="weather"]').closest('.form-group');
-      if (weatherEffectsField.length > 0) {
-        weatherEffectsField.after(customHtml);
-      } else {
-        basicsSection.append(customHtml);
-      }
-    } else {
-      ambienceTab.prepend(customHtml);
-    }
+  // ОТЛАДКА: Выводим структуру для поиска правильного места
+  console.log("D&D Weather | renderSceneConfig вызван. Ищем место для вставки...");
+  
+  // Ищем поле "Погодные эффекты" (weather) в любом месте формы
+  const weatherField = $html.find('select[name="weather"]').closest('.form-group');
+  
+  if (weatherField.length > 0) {
+    console.log("D&D Weather | Найдено поле 'Погодные эффекты', вставляем после него");
+    weatherField.after(customHtml);
   } else {
+    // Если не нашли поле погоды, добавляем в конец формы
+    console.log("D&D Weather | Поле 'Погодные эффекты' не найдено, добавляем в конец");
     $html.find('.sheet-body').append(customHtml);
   }
 });
@@ -212,13 +206,11 @@ Hooks.on("renderSceneConfig", (app, html, data) => {
 Hooks.on("updateScene", (scene, update, options, userId) => {
   if (!game.user.isGM) return;
   
-  // Проверяем, менялись ли флаги, связанные с погодой
   const flagsChanged = update.flags?.world?.['weather-biome'] !== undefined || 
                        update.flags?.world?.['weather-use-global'] !== undefined;
 
   if (flagsChanged) {
     console.log(`D&D Weather | Настройки биома сцены "${scene.name}" изменены, мгновенно обновляем погоду...`);
-    // Небольшая задержка, чтобы Foundry успела применить флаги
     setTimeout(() => applyWeatherToScene(scene), 100);
   }
 });
@@ -240,16 +232,18 @@ Hooks.on("canvasReady", async () => {
 // ═══════════════════════════════════════════
 Hooks.on("updateWorldTime", async (worldTime) => {
   if (!game.user.isGM) return;
+  
+  console.log(`D&D Weather | updateWorldTime вызван: ${worldTime}`);
   await checkAndUpdateWeather();
 });
 
-// ══════════════════════════════════════════
+// ═══════════════════════════════════════════
 // 9. ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ МИРА
 // ═══════════════════════════════════════════
 Hooks.once("ready", async () => {
   if (!game.user.isGM) return;
   
-  console.log("D&D Weather System v2.2 | Модуль готов к работе.");
+  console.log("D&D Weather System v2.3 | Модуль готов к работе.");
 
   const stored = game.settings.get("dnd-weather", "current-weather");
   
@@ -267,4 +261,4 @@ Hooks.once("ready", async () => {
   }
 });
 
-console.log("D&D Weather System v2.2 | Модуль загружен.");
+console.log("D&D Weather System v2.3 | Модуль загружен.");
