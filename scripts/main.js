@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════
 // D&D WEATHER SYSTEM - MAIN ENTRY POINT (v1.1.0)
-// Исправлено: UI, сообщения в чат, дублирование биомов
+// Исправлено: маппинг погоды по биомам, сообщения, UI
 // ═══════════════════════════════════════════
 
-import { BIOMES, BIOME_LABELS, SEASON_LABELS, getSeason, getRandomWeather, getWeatherDescription } from "./weather-data.js";
+import { BIOMES, BIOME_LABELS, SEASON_LABELS, getSeason, getRandomWeather, getWeatherDescription, mapWeatherToBiome } from "./weather-data.js";
 
 // ═══════════════════════════════════════════
 // 1. РЕГИСТРАЦИЯ НАСТРОЕК МОДУЛЯ
@@ -108,38 +108,24 @@ async function checkAndUpdateWeather() {
       await applyWeatherToScene(scene);
     }
 
-    // ПРОСТАЯ ОТПРАВКА СООБЩЕНИЯ (для теста)
-    const gmUser = game.users.find(u => u.isGM && u.active);
-    console.log("D&D Weather | GM User:", gmUser);
-    console.log("D&D Weather | CONST.CHAT_MESSAGE_STYLES:", CONST.CHAT_MESSAGE_STYLES);
-
-    const messageContent = `
-      <div style="border-left: 4px solid #7b3f00; padding: 12px 16px; background: rgba(0,0,0,0.08); border-radius: 4px;">
-        <h3 style="margin: 0 0 6px 0; font-size: 1.15em;">🌦 Смена погоды</h3>
-        <p style="margin: 0 0 4px 0; font-size: 0.85em; opacity: 0.7;">${newWeather.seasonLabel} · Биом: ${newWeather.biomeLabel}</p>
-        <p style="margin: 0 0 6px 0;"><strong>Новая погода:</strong> ${newWeather.label}</p>
-        <p style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;"><strong>⏱ Продлится:</strong> ~${newWeather.duration} ч.</p>
-        ${newWeather.description ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.15);">${newWeather.description}</div>` : ""}
-      </div>
-    `;
-
+    // Отправка сообщения в чат (OOC для теста)
     try {
-      const msg = await ChatMessage.create({
-        user: gmUser?.id || game.user.id,
-        content: messageContent,
-        type: CONST.CHAT_MESSAGE_TYPES.WHISPER || 2,
-        whisper: gmUser ? [gmUser.id] : []
-      });
-      console.log("D&D Weather | Сообщение создано:", msg);
-    } catch (err) {
-      console.error("D&D Weather | Ошибка ChatMessage.create:", err);
-      // Запасной вариант — отправляем в общий чат
       await ChatMessage.create({
         user: game.user.id,
-        content: messageContent,
-        type: CONST.CHAT_MESSAGE_TYPES.OOC || 0
+        content: `
+          <div style="border-left: 4px solid #7b3f00; padding: 12px 16px; background: rgba(0,0,0,0.08); border-radius: 4px;">
+            <h3 style="margin: 0 0 6px 0; font-size: 1.15em;">🌦 Смена погоды</h3>
+            <p style="margin: 0 0 4px 0; font-size: 0.85em; opacity: 0.7;">${newWeather.seasonLabel} · Биом: ${newWeather.biomeLabel}</p>
+            <p style="margin: 0 0 6px 0;"><strong>Новая погода:</strong> ${newWeather.label}</p>
+            <p style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;"><strong>⏱ Продлится:</strong> ~${newWeather.duration} ч.</p>
+            ${newWeather.description ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.15);">${newWeather.description}</div>` : ""}
+          </div>
+        `,
+        style: CONST.CHAT_MESSAGE_STYLES.OOC
       });
-      console.log("D&D Weather | Отправлено запасное OOC сообщение");
+      console.log("D&D Weather | Сообщение о смене погоды отправлено в чат");
+    } catch (err) {
+      console.error("D&D Weather | Ошибка при отправке сообщения:", err);
     }
 
     return true;
@@ -148,7 +134,7 @@ async function checkAndUpdateWeather() {
 }
 
 // ═══════════════════════════════════════════
-// 4. ПРИМЕНЕНИЕ ПОГОДЫ К СЦЕНЕ
+// 4. ПРИМЕНЕНИЕ ПОГОДЫ К СЦЕНЕ (С МАППИНГОМ)
 // ═══════════════════════════════════════════
 async function applyWeatherToScene(scene) {
   const currentWeather = game.settings.get("dnd-weather", "current-weather");
@@ -160,7 +146,6 @@ async function applyWeatherToScene(scene) {
     return;
   }
 
-  // ИСПРАВЛЕНИЕ: Убедимся, что biomeKey — это строка, а не массив
   let biomeKey = localBiome || game.settings.get("dnd-weather", "default-biome") || "forest";
   
   // Если biomeKey оказался массивом (баг), берём первый элемент
@@ -169,25 +154,25 @@ async function applyWeatherToScene(scene) {
     biomeKey = biomeKey[0];
   }
 
-  let visualType = currentWeather.type;
-  
-  if (biomeKey === "dungeon") visualType = "";
+  // ИСПРАВЛЕНИЕ: Применяем маппинг погоды для локального биома
+  let visualType = mapWeatherToBiome(currentWeather.type, biomeKey);
+
+  console.log(`D&D Weather | Глобальная погода: "${currentWeather.type}", биом: ${biomeKey}, визуальный тип: "${visualType}"`);
 
   if (scene.weather !== visualType) {
-    console.log(`D&D Weather | Применяем "${visualType}" к сцене "${scene.name}" (биом: ${biomeKey})`);
+    console.log(`D&D Weather | Применяем "${visualType}" к сцене "${scene.name}"`);
     await scene.update({ weather: visualType });
   }
 }
 
 // ═══════════════════════════════════════════
 // 5. ХУК: НАСТРОЙКИ СЦЕНЫ (УЛУЧШЕННЫЙ UI)
-// ══════════════════════════════════════════
+// ═══════════════════════════════════════════
 Hooks.on("renderSceneConfig", (app, html, data) => {
   const scene = app.document;
   const currentBiome = scene.getFlag("world", "weather-biome") || game.settings.get("dnd-weather", "default-biome") || "forest";
   const useGlobal = scene.getFlag("world", "weather-use-global") ?? true;
 
-  // ИСПРАВЛЕНИЕ: Используем правильную структуру HTML как в Foundry
   const customHtml = `
     <fieldset>
       <legend><strong>🌤 Настройки погоды D&D Weather</strong></legend>
@@ -220,9 +205,9 @@ Hooks.on("renderSceneConfig", (app, html, data) => {
   }
 });
 
-// ═══════════════════════════════════════════
-// 6. НОВЫЙ ХУК: МГНОВЕННОЕ ОБНОВЛЕНИЕ ПРИ СОХРАНЕНИИ СЦЕНЫ
-// ═══════════════════════════════════════════
+// ══════════════════════════════════════════
+// 6. ХУК: МГНОВЕННОЕ ОБНОВЛЕНИЕ ПРИ СОХРАНЕНИИ СЦЕНЫ
+// ══════════════════════════════════════════
 Hooks.on("updateScene", async (scene, update, options, userId) => {
   if (!game.user.isGM) return;
   
@@ -236,23 +221,23 @@ Hooks.on("updateScene", async (scene, update, options, userId) => {
     // Применяем погоду немедленно
     await applyWeatherToScene(scene);
     
-    // Отправляем сообщение мастеру
+    // Отправляем сообщение в чат (OOC для теста)
     const currentWeather = game.settings.get("dnd-weather", "current-weather");
+    
     try {
       await ChatMessage.create({
-        user: game.users.find(u => u.isGM)?.id || game.user.id,
+        user: game.user.id,
         content: `
           <div style="border-left: 4px solid #2e8b57; padding: 12px 16px; background: rgba(0,0,0,0.08); border-radius: 4px;">
             <h3 style="margin: 0 0 6px 0; font-size: 1.15em;">🔄 Погода обновлена для сцены</h3>
             <p style="margin: 0 0 4px 0;"><strong>Сцена:</strong> ${scene.name}</p>
-            <p style="margin: 0 0 6px 0;"><strong>Биом:</strong> ${newBiome || "глобальный"}</p>
+            <p style="margin: 0 0 6px 0;"><strong>Биом:</strong> ${BIOME_LABELS[newBiome] || newBiome || "глобальный"}</p>
             <p style="margin: 0;"><strong>Погода:</strong> ${currentWeather.label}</p>
           </div>
         `,
-        style: CONST.CHAT_MESSAGE_STYLES.WHISPER,
-        whisper: [game.users.find(u => u.isGM)?.id || game.user.id]
+        style: CONST.CHAT_MESSAGE_STYLES.OOC
       });
-      console.log("D&D Weather | Сообщение об обновлении сцены отправлено");
+      console.log("D&D Weather | Сообщение об обновлении сцены отправлено (OOC)");
     } catch (err) {
       console.error("D&D Weather | Ошибка при отправке сообщения:", err);
     }
@@ -283,7 +268,7 @@ Hooks.on("updateWorldTime", async (worldTime) => {
 
 // ═══════════════════════════════════════════
 // 9. ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ МИРА
-// ══════════════════════════════════════════
+// ═══════════════════════════════════════════
 Hooks.once("ready", async () => {
   if (!game.user.isGM) return;
   

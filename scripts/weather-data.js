@@ -156,3 +156,92 @@ export function getWeatherDescription(biomeKey, season, weatherType) {
     duration: picked.duration
   };
 }
+
+// ═══════════════════════════════════════════
+// МАППИНГ ПОГОДЫ ПО БИОМАМ
+// Преобразует глобальный тип погоды в локальный для конкретной сцены
+// ═══════════════════════════════════════════
+
+export const WEATHER_MAPPING = {
+  // Глобальный тип → { локальный биом: визуальный тип }
+  "rain": {
+    forest: "rain",
+    arctic: "snow",          // Дождь в арктике = снег
+    dungeon: "",
+    swamp: "rain",           // В болоте дождь остаётся дождём
+    city: "rain",
+    mountains: "rain",
+    jungle: "rain",
+    coast: "rain",
+    plains: "rain",
+    desert: "rain"           // Редкий, но всё же
+  },
+  "snow": {
+    forest: "snow",
+    arctic: "snow",
+    dungeon: "",
+    swamp: "snow",
+    city: "snow",
+    mountains: "blizzard",   // В горах снег = метель
+    jungle: "rain",          // В джунглях снег тает = дождь
+    coast: "snow",
+    plains: "snow",
+    desert: ""               // В пустыне снег сразу тает
+  },
+  "fog": {
+    forest: "fog",
+    arctic: "fog",
+    dungeon: "",
+    swamp: "fog",
+    city: "fog",
+    mountains: "fog",
+    jungle: "fog",
+    coast: "fog",
+    plains: "fog",
+    desert: "fog"            // Пыльная буря
+  },
+  "autumn-leaves": {
+    forest: "autumn-leaves",
+    arctic: "",              // В арктике нет листьев
+    dungeon: "",
+    swamp: "",
+    city: "autumn-leaves",
+    mountains: "",
+    jungle: "",
+    coast: "",
+    plains: "autumn-leaves",
+    desert: ""
+  },
+  "blizzard": {
+    forest: "snow",
+    arctic: "blizzard",
+    dungeon: "",
+    swamp: "rain",
+    city: "snow",
+    mountains: "blizzard",
+    jungle: "rain",
+    coast: "snow",
+    plains: "snow",
+    desert: ""
+  },
+  "": {
+    forest: "",
+    arctic: "",
+    dungeon: "",
+    swamp: "",
+    city: "",
+    mountains: "",
+    jungle: "",
+    coast: "",
+    plains: "",
+    desert: ""
+  }
+};
+
+export function mapWeatherToBiome(globalWeatherType, localBiome) {
+  const mapping = WEATHER_MAPPING[globalWeatherType];
+  if (!mapping) return globalWeatherType;
+  
+  const localType = mapping[localBiome];
+  return localType !== undefined ? localType : globalWeatherType;
+}
